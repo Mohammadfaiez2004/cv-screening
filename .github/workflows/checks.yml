@@ -1,0 +1,54 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validate-workflow:
+    name: Validate workflow export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JSON is valid, credentials and IDs are placeholders
+        run: |
+          python3 - <<'PY'
+          import json, re, sys
+          path = "workflow/cv-screening-workflow.json"
+          raw = open(path, encoding="utf-8").read()
+          data = json.loads(raw)
+          bad = []
+          for node in data.get("nodes", []):
+              for kind, cred in (node.get("credentials") or {}).items():
+                  if cred.get("id") != "REPLACE_ME":
+                      bad.append(f'{node.get("name")}: {kind} id is not REPLACE_ME')
+              params = node.get("parameters", {})
+              for key in ("documentId", "folderId"):
+                  val = (params.get(key) or {}).get("value") if isinstance(params.get(key), dict) else None
+                  if val and not str(val).startswith("REPLACE_WITH_"):
+                      bad.append(f'{node.get("name")}: {key} is not a placeholder')
+              if str(params.get("chatId", "")).strip().lstrip("-").isdigit():
+                  bad.append(f'{node.get("name")}: chatId looks like a real Telegram id')
+          if data.get("pinData"):
+              bad.append("pinData is not empty (may contain applicant data)")
+          if re.search(r"docs\.google\.com/spreadsheets/d/[A-Za-z0-9_-]{20,}|drive\.google\.com/drive/folders/(?!REPLACE_WITH_)[A-Za-z0-9_-]{20,}", raw):
+              bad.append("a real Google Sheets/Drive URL is present")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print(f'OK: {len(data["nodes"])} nodes, credentials and identifiers are placeholders')
+          PY

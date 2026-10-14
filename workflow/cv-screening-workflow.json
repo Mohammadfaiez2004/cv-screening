@@ -1,0 +1,1584 @@
+{
+  "name": "CV Screening and Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "نموذج التقديم على وظيفة",
+        "formDescription": " pdf يرجى تعبئة بياناتك بدقة ورفع سيرتك الذاتية بصيغة ",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "الاسم الكامل",
+              "fieldName": "الاسم الكامل",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "البريد الإلكتروني",
+              "fieldType": "email",
+              "fieldName": "البريد الإلكتروني",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "رقم الهاتف",
+              "fieldName": "رقم الهاتف",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "سنوات الخبرة",
+              "fieldType": "number",
+              "fieldName": "سنوات الخبرة",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "الوظيفة المتقدم لها",
+              "fieldType": "dropdown",
+              "fieldName": "الوظيفة المتقدم لها",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "مطور Backend"
+                  },
+                  {
+                    "option": "مطور Frontend"
+                  },
+                  {
+                    "option": "مصمم UI/UX"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "CV",
+              "fieldType": "file",
+              "fieldName": "CV",
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "path": "cv-application"
+        }
+      },
+      "id": "ba25a31b-7d25-43b2-8223-0bddbf84ac3a",
+      "name": "نموذج التقديم",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -880,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "سجل المتقدمين",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "البريد الإلكتروني",
+              "lookupValue": "={{ $json['البريد الإلكتروني'] }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "07880400-bef2-4f66-a218-61d47feb243d",
+      "name": "قراءة سجل المتقدمين",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -656,
+        208
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const applicant = $('نموذج التقديم').first().json;\nconst jobTitle = applicant['الوظيفة المتقدم لها'];\nconst today = $now;\nconst oneMonthAgo = today.minus({ days: 30 });\nconst matchingEmailRows = $input.all(); // الصفوف مفلترة بالبريد من Google Sheets مباشرة\n\nconst isDuplicate = matchingEmailRows.some(item => {\n  const row = item.json;\n  if (row['الوظيفة المتقدم لها'] !== jobTitle) return false;\n  const rowDateStr = row['تاريخ التقديم'];\n  if (!rowDateStr) return false;\n  const rowDate = DateTime.fromFormat(String(rowDateStr), 'yyyy-MM-dd');\n  if (!rowDate.isValid) return false;\n  return rowDate >= oneMonthAgo;\n});\n\nreturn [{\n  json: {\n    ...applicant,\n    isDuplicate,\n    ['تاريخ التقديم']: today.toFormat('yyyy-MM-dd')\n  },\n  binary: $('نموذج التقديم').first().binary\n}];"
+      },
+      "id": "c9921d47-3ed0-428a-a6ff-1224b8cd1a8c",
+      "name": "فحص التكرار",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        208
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.isDuplicate}}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "49a4ac72-6c70-4012-9481-37dc9d12cd74",
+      "name": "هل الطلب مكرر؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -208,
+        208
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "2a535f36-3b8f-4b1d-a5f6-3cc8d84665d7",
+      "name": "إيقاف - طلب مكرر",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        16,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "سجل المتقدمين",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "الاسم الكامل": "={{ $('نموذج التقديم').item.json['الاسم الكامل'] }}",
+            "البريد الإلكتروني": "={{ $('نموذج التقديم').item.json['البريد الإلكتروني'] }}",
+            "سنوات الخبرة": "={{ $('نموذج التقديم').item.json['سنوات الخبرة'] }}",
+            "الوظيفة المتقدم لها": "={{ $('نموذج التقديم').item.json['الوظيفة المتقدم لها'] }}",
+            "تاريخ التقديم": "={{ $('هل الطلب مكرر؟').item.json['تاريخ التقديم'] }}",
+            "رابط CV": "={{ $json.webViewLink }}",
+            " رقم الهاتف": "={{ \"'\" + $('نموذج التقديم').item.json['رقم الهاتف'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "الاسم الكامل",
+              "displayName": "الاسم الكامل",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "البريد الإلكتروني",
+              "displayName": "البريد الإلكتروني",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": " رقم الهاتف",
+              "displayName": " رقم الهاتف",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "سنوات الخبرة",
+              "displayName": "سنوات الخبرة",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "الوظيفة المتقدم لها",
+              "displayName": "الوظيفة المتقدم لها",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "تاريخ التقديم",
+              "displayName": "تاريخ التقديم",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "رابط CV",
+              "displayName": "رابط CV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d4752608-ab1d-433c-954c-00a14ce68948",
+      "name": "تسجيل الطلب في السجل",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        464,
+        144
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "الوظائف الشاغرة",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e39f2063-c683-455a-9b08-cdff23ef30b7",
+      "name": "قراءة معايير الوظائف",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        688,
+        64
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const applicant = $('نموذج التقديم').first().json;\nconst cvJson = $('cv استخراج النص من').first().json;\nconst cvText = cvJson.text || cvJson.data || JSON.stringify(cvJson);\nconst jobTitle = String(applicant['الوظيفة المتقدم لها'] || '').trim();\nconst jobs = $input.all();\nconst matched = jobs.find(item => {\n  const row = item.json;\n  const key = Object.keys(row).find(k => k.trim() === 'اسم الوظيفة');\n  if (!key) return false;\n  return String(row[key] || '').trim() === jobTitle;\n});\nlet criteria = {};\nif (matched) {\n  for (const [k, v] of Object.entries(matched.json)) {\n    criteria[k.trim()] = v;\n  }\n}\nreturn [{ json: {\n  applicantName: applicant['الاسم الكامل'],\n  applicantEmail: applicant['البريد الإلكتروني'],\n  applicantPhone: applicant['رقم الهاتف'],\n  statedYearsExperience: applicant['سنوات الخبرة'],\n  jobTitle,\n  cvText,\n  criteria,\n  cvLink: $('تسجيل الطلب في السجل').first().json['رابط CV'] || ''\n} }];"
+      },
+      "id": "997de63d-0ecd-44e6-8092-802647a72f52",
+      "name": "اختيار معايير الوظيفة المطابقة",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{$json['الحالة']}}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "مقبول"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "c5bde84d-26e8-4b89-9331-659082038a32",
+      "name": "هل النتيجة مقبول؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1712,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "المقبولون",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الاسم",
+              "id": "الاسم",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "البريد الإلكتروني",
+              "id": "البريد الإلكتروني",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "رقم الهاتف",
+              "id": "رقم الهاتف",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الوظيفة المتقدم لها",
+              "id": "الوظيفة المتقدم لها",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "سنوات الخبرة",
+              "id": "سنوات الخبرة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "المهارات",
+              "id": "المهارات",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "المؤهل العلمي",
+              "id": "المؤهل العلمي",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "درجة المطابقة",
+              "id": "درجة المطابقة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الحالة",
+              "id": "الحالة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "سبب القرار",
+              "id": "سبب القرار",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "تاريخ التقديم",
+              "id": "تاريخ التقديم",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "GitHub",
+              "id": "GitHub",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "LinkedIn",
+              "id": "LinkedIn",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "روابط أخرى",
+              "id": "روابط أخرى",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "رابط CV",
+              "id": "رابط CV",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "184fafc0-3b04-4964-a2ef-7448c6f10a57",
+      "name": "إضافة إلى المقبولين",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2160,
+        -128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "قيد المراجعة",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الاسم",
+              "id": "الاسم",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "البريد الإلكتروني",
+              "id": "البريد الإلكتروني",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "رقم الهاتف",
+              "id": "رقم الهاتف",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الوظيفة المتقدم لها",
+              "id": "الوظيفة المتقدم لها",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "سنوات الخبرة",
+              "id": "سنوات الخبرة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "المهارات",
+              "id": "المهارات",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "المؤهل العلمي",
+              "id": "المؤهل العلمي",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "درجة المطابقة",
+              "id": "درجة المطابقة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الحالة",
+              "id": "الحالة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "سبب القرار",
+              "id": "سبب القرار",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "تاريخ التقديم",
+              "id": "تاريخ التقديم",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "GitHub",
+              "id": "GitHub",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "LinkedIn",
+              "id": "LinkedIn",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "روابط أخرى",
+              "id": "روابط أخرى",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "رابط CV",
+              "id": "رابط CV",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2dc71ebb-0fd2-42ae-b192-4d3d3e00c795",
+      "name": "إضافة إلى قيد المراجعة",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2160,
+        64
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "المرفوضون",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الاسم",
+              "id": "الاسم",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "البريد الإلكتروني",
+              "id": "البريد الإلكتروني",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "رقم الهاتف",
+              "id": "رقم الهاتف",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الوظيفة المتقدم لها",
+              "id": "الوظيفة المتقدم لها",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "سنوات الخبرة",
+              "id": "سنوات الخبرة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "المهارات",
+              "id": "المهارات",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "المؤهل العلمي",
+              "id": "المؤهل العلمي",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "درجة المطابقة",
+              "id": "درجة المطابقة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "الحالة",
+              "id": "الحالة",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "سبب القرار",
+              "id": "سبب القرار",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "تاريخ التقديم",
+              "id": "تاريخ التقديم",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "GitHub",
+              "id": "GitHub",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "LinkedIn",
+              "id": "LinkedIn",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "روابط أخرى",
+              "id": "روابط أخرى",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "رابط CV",
+              "id": "رابط CV",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c07a3605-f76a-4fe6-9a43-6b87b0bb8870",
+      "name": "إضافة إلى المرفوضين",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2160,
+        256
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "المقبولون",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "98547d93-8684-4953-b51a-316b61b033e7",
+      "name": "قراءة المقبولين",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -656,
+        896
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "قيد المراجعة",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "eea865ea-03e2-413d-8ec5-fa264b07d79b",
+      "name": "قراءة قيد المراجعة",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -432,
+        896
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = $now.toFormat('yyyy-MM-dd');\nconst accepted = $('قراءة المقبولين').all().filter(item => item.json['تاريخ التقديم'] === today);\nconst review = $('قراءة قيد المراجعة').all().filter(item => item.json['تاريخ التقديم'] === today);\n\n// علامات اتجاه النص: تمنع تداخل الأرقام والكلمات الإنجليزية مع النص العربي\nconst RLM = '\\u200F';\nconst iso = v => '\\u2066' + v + '\\u2069';\n\nconst PER_MSG = 10;   // عدد المرشحين في الرسالة الواحدة\nconst MAX = 3800;     // حد أمان تحت حد تيليغرام (4096)\n\nfunction formatLine(item) {\n  const j = item.json;\n  const lines = [\n    `${RLM}• ${j['الاسم'] || ''}`,\n    `${RLM}   الوظيفة: ${j['الوظيفة المتقدم لها'] || ''}`,\n    `${RLM}   الهاتف: ${iso(j['رقم الهاتف'] || '')}`,\n    `${RLM}   درجة المطابقة: ${iso((j['درجة المطابقة'] || '') + '%')}`\n  ];\n  if (j['GitHub']) lines.push(`${RLM}   GitHub: ${iso(j['GitHub'])}`);\n  if (j['LinkedIn']) lines.push(`${RLM}   LinkedIn: ${iso(j['LinkedIn'])}`);\n  return lines.join('\\n');\n}\n\n// تقسيم القائمة: 10 مرشحين كحد أقصى، وبما لا يتجاوز حد الأحرف\nfunction pack(entries) {\n  const groups = [];\n  let cur = [], len = 0;\n  for (const e of entries) {\n    if (cur.length >= PER_MSG || (cur.length && len + e.length + 2 > MAX)) {\n      groups.push(cur); cur = []; len = 0;\n    }\n    cur.push(e); len += e.length + 2;\n  }\n  if (cur.length) groups.push(cur);\n  return groups;\n}\n\nconst header = `📋 ملخص اليوم — ${today}\\n✅ مقبولون: ${accepted.length}  |  🔍 مراجعة: ${review.length}`;\nconst messages = [];\n\nfunction addSection(title, items) {\n  if (!items.length) return;\n  const groups = pack(items.map(formatLine));\n  groups.forEach((g, i) => {\n    const part = groups.length > 1 ? ` (${i + 1}/${groups.length})` : '';\n    messages.push(`${header}\\n\\n${title}${part}\\n\\n` + g.join('\\n\\n'));\n  });\n}\n\naddSection('✅ مقبولون', accepted);\naddSection('🔍 يحتاجون مراجعة', review);\n\nif (!messages.length) messages.push(`${header}\\n\\nلا يوجد مقبولون ولا حالات مراجعة اليوم`);\n\n// كل عنصر يُرسَل كرسالة تيليغرام مستقلة\nreturn messages.map(message => ({ json: { message } }));"
+      },
+      "id": "f727d1a4-1800-4473-be32-c43d1a7a13fe",
+      "name": "تنسيق وإرسال الملخص",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_TELEGRAM_CHAT_ID",
+        "text": "={{$json.message}}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "7ae83c00-77bd-473c-b2db-48ebc045b12f",
+      "name": "إرسال الملخص عبر Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        896
+      ],
+      "maxTries": 3,
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_ME",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 23,
+              "triggerAtMinute": 55
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -928,
+        896
+      ],
+      "id": "ad8b55a1-eb32-472c-bcfc-a5cf7f06d317",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "CV",
+        "options": {}
+      },
+      "id": "1e52582c-dcc3-427a-b232-1ae97a796c4e",
+      "name": "cv استخراج النص من",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.6-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.6-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=معايير الوظيفة:\n{{ JSON.stringify($json.criteria) }}\n\nبيانات المتقدم:\nالاسم: {{$json.applicantName}}\nالبريد: {{$json.applicantEmail}}\nالهاتف: {{$json.applicantPhone}}\nسنوات الخبرة (مصرّح بها من المتقدم نفسه): {{$json.statedYearsExperience}}\n\nنص السيرة الذاتية:\n{{$json.cvText}}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "أنت مساعد توظيف تقوم بتحليل السير الذاتية وتقييم مدى مطابقتها لمتطلبات الوظيفة. أعد الإجابة بصيغة JSON فقط بدون أي نص إضافي، بالحقول التالية: name, email, phone, years_experience, skills, education, match_score (رقم من 0 إلى 100), decision (قيمة واحدة فقط من: مقبول، مراجعة، مرفوض)، reasoning (سبب مختصر)، github (رابط GitHub الشخصي فقط إذا كان مذكوراً حرفياً بنص السيرة الذاتية، وإلا نص فارغ)، linkedin (رابط LinkedIn الشخصي فقط إذا كان مذكوراً حرفياً، وإلا نص فارغ)، other_links (أي روابط أخرى مذكورة حرفياً غير GitHub وLinkedIn، مثل بورتفوليو شخصي أو مواقع أخرى، مفصولة بفاصلة، أو نص فارغ لو ما فيه). لا تخترع أو تولّد روابط غير موجودة فعلياً بالنص — فقط انقل الروابط الموجودة حرفياً كما هي. لحقل years_experience: اعتمد دائماً على الرقم الذي صرّح به المتقدم نفسه في حقل 'سنوات الخبرة' المرفق مع البيانات، واعتبره المصدر الأساسي. فقط إذا لاحظت تناقضاً واضحاً بينه وبين ما هو مذكور فعلياً بنص السيرة الذاتية، اذكر هذا التناقض صراحة في reasoning وقلّل match_score قليلاً بسبب عدم الوضوح. اجعل decision = مقبول إذا match_score >= 70، مراجعة إذا كانت بين 50 و69، ومرفوض إذا أقل من 50.",
+          "maxOutputTokens": 2048,
+          "temperature": 0.3,
+          "topP": 1,
+          "thinkingBudget": 512
+        }
+      },
+      "id": "8bb7b350-f848-449a-a750-4038cf79bf57",
+      "name": "المطابقة AI تحليل وتقييم ال",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1136,
+        64
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REPLACE_ME",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c3",
+              "leftValue": "={{$json['الحالة']}}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "مراجعة"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2ef78313-eea6-4a8f-a7b4-cfe56bc9d3cd",
+      "name": "هل النتيجة تحتاج مراجعة؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1936,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet raw;\nif (item.content) {\n  if (typeof item.content === 'string') {\n    raw = item.content;\n  } else if (item.content.parts && Array.isArray(item.content.parts)) {\n    raw = item.content.parts.map(p => p.text || '').join('');\n  } else {\n    raw = JSON.stringify(item.content);\n  }\n} else {\n  raw = item.text ?? (item.message && item.message.content) ?? item.output ?? JSON.stringify(item);\n}\nconst cleaned = String(raw).replace(/```json|```/g, '').trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { decision: 'مراجعة', reasoning: 'تعذر تحليل استجابة AI تلقائياً - تحتاج مراجعة يدوية', raw: cleaned };\n}\nif (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {\n  parsed = { decision: 'مراجعة', reasoning: 'تعذر تحليل استجابة AI تلقائياً - تحتاج مراجعة يدوية' };\n}\n\n// أي قرار غير معروف يذهب إلى المراجعة البشرية وليس إلى الرفض\nconst ALLOWED_DECISIONS = ['مقبول', 'مراجعة', 'مرفوض'];\nlet decision = String(parsed.decision ?? '').trim();\nlet reasoning = parsed.reasoning || '';\nif (!ALLOWED_DECISIONS.includes(decision)) {\n  reasoning = `[قرار غير معروف من AI: \"${decision || 'فارغ'}\" - تحتاج مراجعة بشرية] ${reasoning}`.trim();\n  decision = 'مراجعة';\n}\n\nconst base = $('اختيار معايير الوظيفة المطابقة').first().json;\n\nfunction normalizeLinks(value) {\n  if (!value) return '';\n  const str = Array.isArray(value) ? value.join(',') : String(value);\n  const parts = str.split(/[,،]/).map(s => s.trim()).filter(Boolean);\n  if (parts.length === 0) return '';\n  const normalized = parts.map(url => /^https?:\\/\\//i.test(url) ? url : 'https://' + url);\n  return normalized.join('\\n');\n}\n\nfunction normalizeSingleLink(value) {\n  if (!value) return '';\n  const url = String(value).trim();\n  if (!url) return '';\n  return /^https?:\\/\\//i.test(url) ? url : 'https://' + url;\n}\n\nreturn [{ json: {\n  ['الاسم']: parsed.name || base.applicantName,\n  ['البريد الإلكتروني']: parsed.email || base.applicantEmail,\n  ['رقم الهاتف']: (base.applicantPhone || parsed.phone) ? \"'\" + String(base.applicantPhone || parsed.phone) : '',\n  ['الوظيفة المتقدم لها']: base.jobTitle,\n  ['سنوات الخبرة']: parsed.years_experience || base.statedYearsExperience || '',\n  ['المهارات']: parsed.skills || '',\n  ['المؤهل العلمي']: parsed.education || '',\n  ['درجة المطابقة']: parsed.match_score || '',\n  ['الحالة']: decision,\n  ['سبب القرار']: reasoning,\n  ['GitHub']: normalizeSingleLink(parsed.github),\n  ['LinkedIn']: normalizeSingleLink(parsed.linkedin),\n  ['روابط أخرى']: normalizeLinks(parsed.other_links),\n  ['رابط CV']: base.cvLink || '',\n  ['تاريخ التقديم']: $now.toFormat('yyyy-MM-dd')\n} }];"
+      },
+      "id": "612a92eb-5f72-4777-8cef-3d2f4fe4583f",
+      "name": "الى بيانات منظمة  ai تحويل نتيجة",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "CV",
+        "name": "={{ $('نموذج التقديم').item.json['الاسم الكامل'] }} - {{ $('نموذج التقديم').item.json['الوظيفة المتقدم لها'] }} - {{ $now.toFormat('yyyy-MM-dd') }}.pdf",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_DRIVE_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "cv المتقدمين",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/REPLACE_WITH_DRIVE_FOLDER_ID"
+        },
+        "options": {}
+      },
+      "id": "3119dbda-2a21-43db-80fe-61199617f721",
+      "name": "رفع CV إلى Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        16,
+        208
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "44211911-022d-47aa-aead-e61264d051f0",
+      "name": "دمج CV والرابط",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        240,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_TELEGRAM_CHAT_ID",
+        "text": "=⚠️ فشل تنفيذ خطوة بوركفلو فلترة CV\nالوقت: {{$now.toFormat('yyyy-MM-dd HH:mm')}}\nالتفاصيل: {{ $json.error && $json.error.message ? $json.error.message : JSON.stringify($json).slice(0,300) }}",
+        "additionalFields": {}
+      },
+      "id": "3da0a8e3-6b7d-409d-9400-00df9507759e",
+      "name": "تنبيه فشل عملية",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        672
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_ME",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "0fb53ed6-1572-40f3-bb09-08970cd909d9",
+      "name": "حلقة إرسال الرسائل",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        112,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "5cf95658-03f7-43bc-bbfa-43fd126b6c13",
+      "name": "انتظار بين الرسائل",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        1120
+      ]
+    }
+  ],
+  "connections": {
+    "نموذج التقديم": {
+      "main": [
+        [
+          {
+            "node": "قراءة سجل المتقدمين",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "قراءة سجل المتقدمين": {
+      "main": [
+        [
+          {
+            "node": "فحص التكرار",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "فحص التكرار": {
+      "main": [
+        [
+          {
+            "node": "هل الطلب مكرر؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "هل الطلب مكرر؟": {
+      "main": [
+        [
+          {
+            "node": "إيقاف - طلب مكرر",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "cv استخراج النص من",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "رفع CV إلى Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "تسجيل الطلب في السجل": {
+      "main": [
+        [
+          {
+            "node": "قراءة معايير الوظائف",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "تنبيه فشل عملية",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "قراءة معايير الوظائف": {
+      "main": [
+        [
+          {
+            "node": "اختيار معايير الوظيفة المطابقة",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "اختيار معايير الوظيفة المطابقة": {
+      "main": [
+        [
+          {
+            "node": "المطابقة AI تحليل وتقييم ال",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "هل النتيجة مقبول؟": {
+      "main": [
+        [
+          {
+            "node": "إضافة إلى المقبولين",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "هل النتيجة تحتاج مراجعة؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "قراءة المقبولين": {
+      "main": [
+        [
+          {
+            "node": "قراءة قيد المراجعة",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "قراءة المقبولين",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "المطابقة AI تحليل وتقييم ال": {
+      "main": [
+        [
+          {
+            "node": "الى بيانات منظمة  ai تحويل نتيجة",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "هل النتيجة تحتاج مراجعة؟": {
+      "main": [
+        [
+          {
+            "node": "إضافة إلى قيد المراجعة",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "إضافة إلى المرفوضين",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "الى بيانات منظمة  ai تحويل نتيجة": {
+      "main": [
+        [
+          {
+            "node": "هل النتيجة مقبول؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "قراءة قيد المراجعة": {
+      "main": [
+        [
+          {
+            "node": "تنسيق وإرسال الملخص",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cv استخراج النص من": {
+      "main": [
+        [
+          {
+            "node": "دمج CV والرابط",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "رفع CV إلى Drive": {
+      "main": [
+        [
+          {
+            "node": "دمج CV والرابط",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "تنبيه فشل عملية",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "دمج CV والرابط": {
+      "main": [
+        [
+          {
+            "node": "تسجيل الطلب في السجل",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "إضافة إلى المقبولين": {
+      "main": [
+        [],
+        [
+          {
+            "node": "تنبيه فشل عملية",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "إضافة إلى قيد المراجعة": {
+      "main": [
+        [],
+        [
+          {
+            "node": "تنبيه فشل عملية",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "إضافة إلى المرفوضين": {
+      "main": [
+        [],
+        [
+          {
+            "node": "تنبيه فشل عملية",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "تنسيق وإرسال الملخص": {
+      "main": [
+        [
+          {
+            "node": "حلقة إرسال الرسائل",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "حلقة إرسال الرسائل": {
+      "main": [
+        [],
+        [
+          {
+            "node": "إرسال الملخص عبر Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "إرسال الملخص عبر Telegram": {
+      "main": [
+        [
+          {
+            "node": "انتظار بين الرسائل",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "انتظار بين الرسائل": {
+      "main": [
+        [
+          {
+            "node": "حلقة إرسال الرسائل",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

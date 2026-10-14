@@ -1,0 +1,43 @@
+# Secrets and local configuration - never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+*credentials*.json
+*secret*.json
+client_secret*.json
+service-account*.json
+
+# n8n exports that may contain real credentials, IDs or applicant data.
+# Only workflow/cv-screening-workflow.json (placeholders only) is tracked.
+workflow/*.local.json
+workflow/*.private.json
+workflow/*.original.json
+my-workflow*.json
+n8n-export*/
+.n8n/
+
+# Applicant data - never commit
+*.pdf
+*.csv
+*.xlsx
+cvs/
+applicants/
+
+# Logs and dumps
+*.log
+logs/
+*.dump
+*.backup
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
