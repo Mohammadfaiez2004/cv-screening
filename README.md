@@ -69,4 +69,4 @@ This workflow **assists** recruiters; it must not be the only decision-maker. AI
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Copyright © 2026 Mohammad Faiez Almagthoub. **All rights reserved.** This repository is public for viewing and evaluation only; copying, modification and reuse require written permission (see [LICENSE](LICENSE)). The setup guide documents how the project works and is not a grant of rights.
